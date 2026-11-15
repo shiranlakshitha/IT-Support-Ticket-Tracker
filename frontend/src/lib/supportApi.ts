@@ -37,6 +37,7 @@ export type CreateTicketInput = {
 
 const DEMO_SESSION_KEY = "support-desk-demo-session";
 const DEMO_CREATED_TICKETS_KEY = "support-desk-demo-tickets";
+const DEMO_UPDATED_TICKETS_KEY = "support-desk-demo-ticket-updates";
 const DEMO_USER: AuthUser = { id: "demo-admin", email: "admin" };
 const DEMO_TICKETS: Ticket[] = [
   {
@@ -99,6 +100,26 @@ function getDemoCreatedTickets(): Ticket[] {
   } catch {
     return [];
   }
+}
+
+function getDemoTicketUpdates(): Record<string, Ticket> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const storedTickets = localStorage.getItem(DEMO_UPDATED_TICKETS_KEY);
+    return storedTickets
+      ? (JSON.parse(storedTickets) as Record<string, Ticket>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function getAllDemoTickets(): Ticket[] {
+  const updates = getDemoTicketUpdates();
+  return [...getDemoCreatedTickets(), ...DEMO_TICKETS].map(
+    (ticket) => updates[ticket.id] ?? ticket,
+  );
 }
 
 export class ApiError extends Error {
@@ -191,7 +212,7 @@ export async function getTickets(
   if (hasDemoSession()) {
     const page = query.page ?? 1;
     const pageSize = 20;
-    const filteredTickets = [...getDemoCreatedTickets(), ...DEMO_TICKETS].filter(
+    const filteredTickets = getAllDemoTickets().filter(
       (ticket) =>
         (!query.status || ticket.status === query.status) &&
         (!query.priority || ticket.priority === query.priority),
@@ -222,6 +243,73 @@ export async function getTickets(
   }
 
   return (await response.json()) as TicketList;
+}
+
+export async function getTicket(
+  id: string,
+  signal?: AbortSignal,
+): Promise<Ticket> {
+  if (hasDemoSession()) {
+    const ticket = getAllDemoTickets().find((item) => item.id === id);
+    if (!ticket) throw new ApiError("Ticket not found.", 404);
+    return ticket;
+  }
+
+  const response = await fetch(`/api/tickets/${id}`, {
+    credentials: "include",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await readError(response), response.status);
+  }
+
+  return (await response.json()) as Ticket;
+}
+
+export async function updateTicketStatus(
+  id: string,
+  status: TicketStatus,
+): Promise<Ticket> {
+  if (hasDemoSession()) {
+    const ticket = getAllDemoTickets().find((item) => item.id === id);
+    if (!ticket) throw new ApiError("Ticket not found.", 404);
+    if (ticket.status === status) return ticket;
+
+    const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = {
+      OPEN: "IN_PROGRESS",
+      IN_PROGRESS: "RESOLVED",
+    };
+
+    if (nextStatus[ticket.status] !== status) {
+      throw new ApiError("Ticket status must follow the support workflow.", 409);
+    }
+
+    const updatedTicket = {
+      ...ticket,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+    const updates = getDemoTicketUpdates();
+    updates[id] = updatedTicket;
+    localStorage.setItem(DEMO_UPDATED_TICKETS_KEY, JSON.stringify(updates));
+    return updatedTicket;
+  }
+
+  const response = await fetch(`/api/tickets/${id}/status`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await readError(response), response.status);
+  }
+
+  return (await response.json()) as Ticket;
 }
 
 export async function createTicket(input: CreateTicketInput): Promise<Ticket> {

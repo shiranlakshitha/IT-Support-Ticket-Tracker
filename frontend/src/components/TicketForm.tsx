@@ -60,12 +60,12 @@ export function TicketForm() {
     setIsSubmitting(true);
 
     try {
-      await createTicket({
+      const ticket = await createTicket({
         title: trimmedTitle,
         description: trimmedDescription,
         priority,
       });
-      router.push("/tickets");
+      router.push(`/tickets/${ticket.id}`);
       router.refresh();
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
