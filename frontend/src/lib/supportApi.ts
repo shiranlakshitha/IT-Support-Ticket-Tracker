@@ -29,7 +29,14 @@ export type TicketQuery = {
   page?: number;
 };
 
+export type CreateTicketInput = {
+  title: string;
+  description: string;
+  priority: TicketPriority;
+};
+
 const DEMO_SESSION_KEY = "support-desk-demo-session";
+const DEMO_CREATED_TICKETS_KEY = "support-desk-demo-tickets";
 const DEMO_USER: AuthUser = { id: "demo-admin", email: "admin" };
 const DEMO_TICKETS: Ticket[] = [
   {
@@ -81,6 +88,17 @@ const DEMO_TICKETS: Ticket[] = [
 
 function hasDemoSession() {
   return typeof window !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "active";
+}
+
+function getDemoCreatedTickets(): Ticket[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const storedTickets = localStorage.getItem(DEMO_CREATED_TICKETS_KEY);
+    return storedTickets ? (JSON.parse(storedTickets) as Ticket[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export class ApiError extends Error {
@@ -173,7 +191,7 @@ export async function getTickets(
   if (hasDemoSession()) {
     const page = query.page ?? 1;
     const pageSize = 20;
-    const filteredTickets = DEMO_TICKETS.filter(
+    const filteredTickets = [...getDemoCreatedTickets(), ...DEMO_TICKETS].filter(
       (ticket) =>
         (!query.status || ticket.status === query.status) &&
         (!query.priority || ticket.priority === query.priority),
@@ -204,4 +222,37 @@ export async function getTickets(
   }
 
   return (await response.json()) as TicketList;
+}
+
+export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
+  if (hasDemoSession()) {
+    const now = new Date().toISOString();
+    const ticket: Ticket = {
+      id: `${Date.now().toString(16)}${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      priority: input.priority,
+      status: "OPEN",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const tickets = [ticket, ...getDemoCreatedTickets()];
+    localStorage.setItem(DEMO_CREATED_TICKETS_KEY, JSON.stringify(tickets));
+    return ticket;
+  }
+
+  const response = await fetch("/api/tickets", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await readError(response), response.status);
+  }
+
+  return (await response.json()) as Ticket;
 }
