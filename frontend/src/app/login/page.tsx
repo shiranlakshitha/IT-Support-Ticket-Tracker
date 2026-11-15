@@ -65,6 +65,13 @@ export default function LoginPage() {
 
           <LoginForm />
 
+          <div className="demo-credentials" aria-label="Demo credentials">
+            <span>Demo login</span>
+            <code>admin</code>
+            <span>/</span>
+            <code>123</code>
+          </div>
+
           <div className="security-note">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
               <rect x="5" y="10" width="14" height="10" rx="2" />

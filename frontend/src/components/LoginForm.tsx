@@ -19,8 +19,8 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("123");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,12 +31,12 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      await login(email.trim(), password);
+      await login(username.trim(), password);
       router.replace("/tickets");
       router.refresh();
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        setError("The email or password you entered is incorrect.");
+        setError("The username or password you entered is incorrect.");
       } else {
         setError("We couldn’t sign you in. Check your connection and try again.");
       }
@@ -48,21 +48,20 @@ export function LoginForm() {
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
       <div className="space-y-2">
-        <label className="form-label" htmlFor="email">
-          Email address
+        <label className="form-label" htmlFor="username">
+          Username
         </label>
         <input
-          autoComplete="email"
+          autoComplete="username"
           autoFocus
           className="form-input"
-          id="email"
-          inputMode="email"
-          name="email"
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@company.com"
+          id="username"
+          name="username"
+          onChange={(event) => setUsername(event.target.value)}
+          placeholder="Enter your username"
           required
-          type="email"
-          value={email}
+          type="text"
+          value={username}
         />
       </div>
 
@@ -107,7 +106,7 @@ export function LoginForm() {
 
       <button
         className="submit-button"
-        disabled={isSubmitting || !email || !password}
+        disabled={isSubmitting || !username || !password}
         type="submit"
       >
         {isSubmitting ? (
